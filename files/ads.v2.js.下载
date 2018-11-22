@@ -1,0 +1,298 @@
+/*************************************************************
+ * 首页 - 文字链广告接入推广后台业务逻辑                     *
+ * Author       Cloud                                        *
+ * UpdateDate   2013-12-28                                   *
+ * Copyright:   1997-2013 Netease Inc. All rights reserved.  *
+ *************************************************************/
+(function(window){
+
+    //跨域调用方法
+function fGetScript(sUrl, fSuc, fErr){
+	var oScript = document.createElement("script");
+	oScript.setAttribute("type", "text/javascript");
+	oScript.setAttribute("src", sUrl);
+	try{oScript.setAttribute("defer", "defer");}catch(e){}
+	window.document.body.appendChild(oScript);
+	if(oScript.onreadystatechange !== undefined){ // IE8-支持，IE9、10同时支持onload，IE11+仅支持onload
+		oScript.onreadystatechange = function(){
+	        if(!this.readyState || this.readyState == 'loaded' || this.readyState == 'complete'){
+	           fSuc && fSuc();
+	        }
+	    };
+	}else{
+		oScript.onload = function(){
+	        if(!this.readyState || this.readyState == 'loaded' || this.readyState == 'complete'){
+	           fSuc && fSuc();
+	        }
+	    };
+	}
+
+    oScript.onerror = function(){
+    	fErr && fErr();
+    };
+}
+    //获取Cookie
+function fGetCookie(sName){
+    var sSearch = sName + "=";
+    if(document.cookie.length > 0){
+       offset = document.cookie.indexOf(sSearch)
+       if(offset != -1){
+          offset += sSearch.length;
+          end = document.cookie.indexOf(";", offset)
+          if(end == -1) end = document.cookie.length;
+           var oRawString = unescape(document.cookie.substring(offset, end));
+ 
+           // 过滤
+           if((typeof oRawString == 'string') && oRawString.constructor == String){
+               oRawString = oRawString.replace(/[\<\>\'\"\;]/g, "");
+           }
+ 
+           return oRawString;
+       }
+       else return ""
+    }
+ }
+
+ /**
+ * JSONP
+ * @param  {String} sInterface 接口路径
+ * @param  {Object} oParam     参数对象
+ */
+function fJSONP(sInterface, oParam){
+    if(!sInterface){
+        return;
+    }
+    var sUrl = sInterface;
+    var sSearch = '&';
+    for(var i in oParam){
+        sSearch += i + '=' + oParam[i] + '&';
+    }
+    var aSearch = sSearch.split('&');
+    aSearch.pop();
+    aSearch.shift();
+    sSearch = aSearch.join("&");
+    fGetScript(sInterface  + '?' + sSearch + '&rnd=' + Math.random());
+}
+
+    window.loginExtAD = {
+        isOpen              : true,             // 接入个性化后台总开关
+        init                : fInit,            // 初始化
+        initData            : fInitData,        // 初始化数据
+        initParam           : fInitParam,       // 初始化请求参数
+        initInterface       : fInitInterface,   // 初始化请求接口
+        getData             : fGetData,         // 获取数据
+        callback            : fCallback,        // 数据回调处理
+        template            : fTemplate,        // 替换模板变量
+        outputHtml 			: fOutputHtml, 		// 输出最终模板
+
+        _data               : {},               // 广告参数存储对象
+        _dftData            : {},               // 默认广告参数对象
+        _curDomain          : '',               // 当前域
+        _interface          : '',               // 接口url
+        _param              : {},               // 请求参数对象
+        _ver                : 4,                // 后台版本
+
+        _tpl                : { 				// 模板
+        	"163.com" : '<li class="ext-#{index}">#{div}</li>',
+            "126.com" : '<li class="ext-#{index}">#{div}</li>',
+            "yeah.net" : '#{div}',
+            "email.163.com" : '<li class="ext-#{index}"><span>·</span>#{div}</li>'
+        },
+        _adNum 				: { 				// 各域广告条数（实际根据后端返回，这里仅作容灾用）
+        	"163.com" : 2,
+            "126.com" : 2,
+            "yeah.net" : 1,
+            "email.163.com" : 3
+        },
+        _dftAD : [
+			{
+				pid : 1,
+				div : '<a href="http://you.163.com/" target="_blank" style="">网易自营电商严选30天无忧退货</a>'
+			},
+			{
+				pid : 2,
+				div : '<a href="http://you.163.com/act/static/rSjnmfSGjC.html?from=web_gg_mail_dlywz_20" target="_blank" style="">好生活从收到一份好的礼物开始</a>'
+			},
+			{
+				pid : 3,
+				div : '<a href="http://mail.163.com/html/ntesmail6/" target="_blank" style="">网易邮箱6.0版介绍</a>'
+			}
+		],
+		_bSuc 			: false 				// 是否成功返回推广内容
+    };
+
+    function fInit(){
+        var that = this;
+        // 进入个性化后台推送
+        that.initData();
+        that.initParam();
+        that.initInterface();
+        that.getData();
+    }
+
+    function fInitData(){
+        var that = this;
+        var sDefaultHtml = '';
+
+    	that._curDomain = 'email.163.com'; // 默认email（特殊处理）
+    	// if(gOption.sCookieDomain != that._curDomain){
+    	// 	// 163/126/yeah
+    	// 	that._curDomain = gOption.sDomain;
+    	// }
+    	// 默认容灾推广文字链
+        if(that._dftAD.length > 0){
+        	for(var i=0, l=that._dftAD.length; i<l; i++){
+        		that._dftAD[i].index = that._dftAD[i].pid;
+        	}
+            sDefaultHtml = that.outputHtml(that._dftAD);
+        }
+
+        that._data = {
+            // 个性化后台开关
+            domain : {
+                "163.com" : true,
+                "126.com" : true,
+                "yeah.net" : true,
+                "email.163.com" : true
+            },
+            // 默认数据
+            html : sDefaultHtml
+        };
+
+        // 3秒后判断广告返回，仍无返回，则出容灾推广
+		setTimeout(function(){
+			if(that._bSuc){
+				return;
+			}else{
+		        // 填充dom结构
+		        var oExtADWrap = document.getElementById('extText');
+		        oExtADWrap.innerHTML = that._data.html;
+			}
+		}, 3000);
+    }
+
+    // 初始化请求参数
+    function fInitParam(){
+        var that = this;
+        var oParam = that._param;
+        
+        oParam.uid = 'nt@email.163.com';
+        oParam.domain = 'email.163.com';
+        oParam.ver = that._ver; // 后台版本号
+        oParam.ph = -1; // 登录前
+        oParam.callback = 'loginExtAD.callback'; // 回调函数
+    }
+
+    // 初始化请求接口
+    function fInitInterface(){
+        var that = this;
+        var sInterface = 'https://ir.mail.163.com/get.do';
+        try{
+            if(that._curDomain == '163.com' || that._curDomain == 'email.163.com'){
+                sInterface = 'https://ir.mail.163.com/get.do';
+            }
+            if(that._curDomain == '126.com'){
+                sInterface = 'https://ir.mail.126.com/get.do';
+            }
+            if(that._curDomain == 'yeah.net'){
+                sInterface = 'https://ir.mail.yeah.net/get.do';
+            }
+        }catch(e){}
+        that._interface = sInterface;
+    }
+
+    // 获取数据
+    function fGetData(){
+        var that = this;
+        if(!that.isOpen){
+            that.callback();
+            return;
+        }
+        var oParam = that._param;
+        var sInterface = that._interface;
+        // 当前域的开关打开
+        if(that._data.domain[that._curDomain]){
+            fJSONP(sInterface, oParam);
+        }else{
+            that.callback();
+        }
+    }
+
+    // 数据返回处理
+    function fCallback(oData){
+        var that = this;
+        var oDestData = that._data;
+        var aLt = [];
+
+    	if(oData.templateUrl == undefined){
+    		/*setTimeout(function(){
+	    		that.getData();
+    		}, 50);*/
+    	}else{
+    		fGetScript(oData.templateUrl, function(){
+	        	// 若个性后台有返回，则覆盖默认值
+		        if(oData && oData.lt){
+		            // 调用js转化广告模板
+		            if( typeof gAdTemplate != undefined && gAdTemplate.parse){
+		                that._bSuc = true;
+	                	// 按pid权重重排推广数组
+		            	aLt = oData.lt;
+		            	for (var i = aLt.length - 1; i > 0; --i){
+							for (var j = 0; j < i; ++j){
+								if (aLt[j].pid > aLt[j + 1].pid){
+									var temp = aLt[j];
+									aLt[j] = aLt[j + 1];
+									aLt[j + 1] = temp;
+								}
+							}
+						}
+						oData.lt = aLt;
+		                oDestData.html = that.outputHtml(gAdTemplate.parse(oData).lt);
+		            }
+		        }
+		        // 填充dom结构
+		        var oExtADWrap = document.getElementById('extText');
+		        oExtADWrap.innerHTML = oDestData.html;
+
+		        // yeah域特殊处理文字阴影
+		        if(that._curDomain == 'yeah.net'){
+					indexLogin.shadowFix();
+				}
+			});
+    	}
+    }
+
+    /**
+     * 输出各域所需的页面dom结构
+     * @param  Array	 aAds 	推广文字链
+     * @return String    dom结构字符串
+     */
+    function fOutputHtml(aAds){
+    	var that = this;
+    	var sTempHtml = '';
+    	var nLen = that._adNum[that._curDomain];
+    	// 推广后台有可能返回少于规定数目
+    	if(that._bSuc){
+			for(var i=0, l=aAds.length; i<l; i++){
+				aAds[i].index = i + 1;
+			}
+    		if(aAds.length < nLen){
+    			for(var j=0; j<nLen; j++){
+    				that._dftAD[j].index = aAds.length + j + 1;
+    			}
+    			aAds = aAds.concat(that._dftAD);
+    		}
+    	}
+    	for(var i=0; i<nLen; i++){
+    		sTempHtml += that.template(that._tpl[that._curDomain], aAds[i]);
+    	}
+    	return sTempHtml;
+    }
+
+    function fTemplate(s, o){
+        var rVar = /#\{([^\{\}]*?)\}/g;
+        return s.replace(rVar, function(sAll, sKey){
+            return typeof(o[sKey]) == undefined ? '' : o[sKey];
+        });
+    }
+})(window);
