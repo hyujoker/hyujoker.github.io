@@ -6,6 +6,16 @@
  <link rel="stylesheet" href="../css/jquery.fullPage.css" type="text/css"/>
  <link rel="stylesheet" href="../css/memories.css" type="text/css"/>
  <link rel="stylesheet" href="../css/bubbles.css" type="text/css" />
+ <script type="text/javascript">
+        function init() {
+            var myAudio = document.getElementById("audio");
+            myAudio.addEventListener('ended', loopAudio, false);
+        }
+        function loopAudio() {
+            var myAudio = document.getElementById("audio");
+            myAudio.play();
+        }
+    </script>
 </head>
 
 <body>
@@ -15,6 +25,7 @@
       <div class="section">
           <div class="ly-box01">
             <div class="ly-txt01">
+              <audio id="audio" src="../music/love.mp3" controls></audio>
               <p class="ly-stxt01">写给我最爱的人，</p>
               <p class="ly-stxt02">汪佩丽小朋友，</p>
               <p class="ly-stxt03">今天是你的第22个生日啦</p>
@@ -124,7 +135,7 @@
           <div class="ly-box31">
               <div class="ly-txt32">
                   <p>王小波在《爱你就像爱生命》里面写：</p>
-				          <p>我是个俗气至顶的人，见山是山，见海是海，见花便是花。</p>
+                  <p>我是个俗气至顶的人，见山是山，见海是海，见花便是花。</p>
                   <p>唯独见了你，云海开始翻涌，江潮开始澎湃，昆虫的小触须挠着全世界的痒。</p>
                   <p>你无需开口，我和天地万物便通通奔向你。</p>
               </div>
@@ -154,7 +165,7 @@
           <div class="ly-box52">
               <div class="ly-txt32">
                  <p> 你是我生命里的那个十之一二，</p>
-				         <p> 能让我不再踌躇彷徨于那八九，只向着美好走过去。</p>
+                 <p> 能让我不再踌躇彷徨于那八九，只向着美好走过去。</p>
                  <p> 所以感谢你的出生，让我的人生也充满了意义呀。</p>
               </div>
               <div class="ly-imgbox21">
@@ -203,7 +214,7 @@
 
 
 
-		
+    
 
        </div>
   <!--试验-->
@@ -226,5 +237,6 @@
   <!-- <script src="../js/auto-play.js"></script> -->
   <script src="../js/memories.js"></script>
   <audio autoplay="autoplay" loop="loop"><source src="../music/love.mp3"></audio>
+
 </body>
 </html>
